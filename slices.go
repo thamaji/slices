@@ -1,9 +1,24 @@
 package slices
 
 import (
-	"constraints"
 	"math/rand"
 )
+
+type integer interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
+}
+
+type float interface {
+	~float32 | ~float64
+}
+
+type complex interface {
+	~complex64 | ~complex128
+}
+
+type ordered interface {
+	integer | float | string
+}
 
 // 指定した位置の要素を返す。
 func Get[T any](slice []T, index int) (T, bool) {
@@ -692,7 +707,7 @@ func PartitionInPlaceFunc[T any](slice []T, f func(T) bool) ([]T, []T) {
 }
 
 // 要素の合計を返す。
-func Sum[T constraints.Ordered | constraints.Complex](slice []T) T {
+func Sum[T ordered | complex](slice []T) T {
 	if len(slice) == 0 {
 		return *new(T)
 	}
@@ -705,7 +720,7 @@ func Sum[T constraints.Ordered | constraints.Complex](slice []T) T {
 }
 
 // 要素をすべて掛ける。
-func Product[T constraints.Integer | constraints.Float | constraints.Complex](slice []T) T {
+func Product[T integer | float | complex](slice []T) T {
 	if len(slice) == 0 {
 		return *new(T)
 	}
@@ -718,7 +733,7 @@ func Product[T constraints.Integer | constraints.Float | constraints.Complex](sl
 }
 
 // 最大の要素を返す。
-func Max[T constraints.Ordered](slice []T) T {
+func Max[T ordered](slice []T) T {
 	if len(slice) == 0 {
 		return *new(T)
 	}
@@ -733,7 +748,7 @@ func Max[T constraints.Ordered](slice []T) T {
 }
 
 // 要素を変換して最大の要素を返す。
-func MaxBy[T1 any, T2 constraints.Ordered](slice []T1, f func(T1) T2) T2 {
+func MaxBy[T1 any, T2 ordered](slice []T1, f func(T1) T2) T2 {
 	if len(slice) == 0 {
 		return *new(T2)
 	}
@@ -749,7 +764,7 @@ func MaxBy[T1 any, T2 constraints.Ordered](slice []T1, f func(T1) T2) T2 {
 }
 
 // 最小の要素を返す。
-func Min[T constraints.Ordered](slice []T) T {
+func Min[T ordered](slice []T) T {
 	if len(slice) == 0 {
 		return *new(T)
 	}
@@ -764,7 +779,7 @@ func Min[T constraints.Ordered](slice []T) T {
 }
 
 // 要素を変換して最小の要素を返す。
-func MinBy[T1 any, T2 constraints.Ordered](slice []T1, f func(T1) T2) T2 {
+func MinBy[T1 any, T2 ordered](slice []T1, f func(T1) T2) T2 {
 	if len(slice) == 0 {
 		return *new(T2)
 	}
