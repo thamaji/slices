@@ -49,22 +49,70 @@ func RunWith[T any](slice []T, f func(T)) func(int) bool {
 }
 
 // 指定した位置に要素を追加する。
-func Insert[T any](slice []T, index int, v T) []T {
-	return append(slice[:index], append([]T{v}, slice[index:]...)...)
+func Insert[T any](slice []T, index int, v ...T) []T {
+	return append(slice[:index], append(v, slice[index:]...)...)
 }
 
-// 指定した位置にスライスの全要素を追加する。
-func InsertAll[T any](slice []T, index int, v []T) []T {
-	return append(slice[:index], append(v, slice[index:]...)...)
+// 末尾に要素を追加する。
+func Push[T any](slice []T, v ...T) []T {
+	return append(slice, v...)
+}
+
+// 先頭に要素を追加する。
+func PushBack[T any](slice []T, v ...T) []T {
+	return append(v, slice...)
+}
+
+// 末尾から要素を取り出す。
+func Pop[T any](slice []T) (T, []T) {
+	if len(slice) == 0 {
+		return *new(T), slice
+	}
+	return slice[len(slice)-1], slice[:len(slice)-1]
+}
+
+// 末尾からn個の要素を取り出す。
+func PopN[T any](slice []T, n int) ([]T, []T) {
+	if n > len(slice) {
+		n = len(slice)
+	}
+	return slice[len(slice)-n:], slice[:len(slice)-n]
+}
+
+// 先頭から要素を取り出す。
+func PopBack[T any](slice []T) (T, []T) {
+	if len(slice) == 0 {
+		return *new(T), slice
+	}
+	return slice[0], slice[1:]
+}
+
+// 先頭からn個の要素を取り出す。
+func PopBackN[T any](slice []T, n int) ([]T, []T) {
+	if n > len(slice) {
+		n = len(slice)
+	}
+	return slice[:n], slice[n:]
 }
 
 // 指定した位置の要素を削除する。
 func Remove[T any](slice []T, index int) []T {
-	if index < len(slice)-1 {
-		copy(slice[index:], slice[index+1:])
+	return RemoveN(slice, index, 1)
+}
+
+// 指定した位置からn個の要素を削除する。
+func RemoveN[T any](slice []T, index int, n int) []T {
+	if index+n > len(slice) {
+		n = len(slice) - index
 	}
-	slice[len(slice)-1] = *new(T)
-	return slice[:len(slice)-1]
+	if index > len(slice) {
+		return slice
+	}
+	copy(slice[index:], slice[index+n:])
+	for i := len(slice) - n; i < len(slice); i++ {
+		slice[i] = *new(T)
+	}
+	return slice[:len(slice)-n]
 }
 
 // 要素をランダムに入れ替える。
@@ -223,6 +271,24 @@ func LastIndexFunc[T any](slice []T, f func(T) bool) int {
 	return -1
 }
 
+// 逆順にしたスライスを返す。
+func Reverse[T any](slice []T) []T {
+	dst := make([]T, 0, len(slice))
+	for i := len(slice) - 1; i >= 0; i-- {
+		dst = append(dst, slice[i])
+	}
+	return dst
+}
+
+// 逆順にしたスライスを返す。
+func ReverseInPlace[T any](slice []T) []T {
+	for i := 0; i < len(slice)/2; i++ {
+		j := len(slice) - i - 1
+		slice[i], slice[j] = slice[j], slice[i]
+	}
+	return slice
+}
+
 // 値を変換したスライスを返す。
 func MapFunc[T1, T2 any](slice []T1, f func(T1) T2) []T2 {
 	dst := make([]T2, len(slice))
@@ -259,49 +325,50 @@ func ReduceRightFunc[T any](slice []T, f func(T, T) T) T {
 }
 
 // 初期値と要素を先頭から順に演算する。
-func FoldFunc[T1, T2 any](slice []T1, v T2) func(func(T2, T1) T2) T2 {
-	return func(f func(T2, T1) T2) T2 {
-		for i := range slice {
-			v = f(v, slice[i])
-		}
-		return v
+func FoldFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) T2 {
+	for i := range slice {
+		v = f(v, slice[i])
 	}
+	return v
 }
 
 // 初期値と要素を終端から順に演算する。
-func FoldRightFunc[T1, T2 any](slice []T1, v T2) func(func(T2, T1) T2) T2 {
-	return func(f func(T2, T1) T2) T2 {
-		for i := len(slice) - 1; i >= 0; i-- {
-			v = f(v, slice[i])
-		}
-		return v
+func FoldRightFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) T2 {
+	for i := len(slice) - 1; i >= 0; i-- {
+		v = f(v, slice[i])
 	}
+	return v
 }
 
 // 初期値と要素を先頭から順に演算して途中経過のスライスを返す。
-func ScanFunc[T1, T2 any](slice []T1, v T2) func(func(T2, T1) T2) []T2 {
+func ScanFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) []T2 {
 	dst := make([]T2, 0, len(slice)+1)
 	dst = append(dst, v)
-	return func(f func(T2, T1) T2) []T2 {
-		for i := range slice {
-			v = f(v, slice[i])
-			dst = append(dst, v)
-		}
-		return dst
+	for i := range slice {
+		v = f(v, slice[i])
+		dst = append(dst, v)
 	}
+	return dst
 }
 
 // 初期値と要素を終端から順に演算して途中経過のスライスを返す。
-func ScanRightFunc[T1, T2 any](slice []T1, v T2) func(func(T2, T1) T2) []T2 {
+func ScanRightFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) []T2 {
 	dst := make([]T2, 0, len(slice)+1)
 	dst = append(dst, v)
-	return func(f func(T2, T1) T2) []T2 {
-		for i := len(slice) - 1; i >= 0; i-- {
-			v = f(v, slice[i])
-			dst = append(dst, v)
-		}
-		return dst
+	for i := len(slice) - 1; i >= 0; i-- {
+		v = f(v, slice[i])
+		dst = append(dst, v)
 	}
+	return dst
+}
+
+// スライスを平坦化する。
+func Flatten[T any](slice [][]T) []T {
+	dst := make([]T, 0, len(slice))
+	for i := range slice {
+		dst = append(dst, slice[i]...)
+	}
+	return dst
 }
 
 // 値をスライスに変換し、それらを結合したスライスを返す。
@@ -463,6 +530,19 @@ func DropWhileFunc[T any](slice []T, f func(T) bool) []T {
 	return []T{}
 }
 
+// スライスが一致していたらtrue。
+func Equal[T comparable](slices1 []T, slices2 []T) bool {
+	if len(slices1) != len(slices2) {
+		return false
+	}
+	for i := 0; i < len(slices1); i++ {
+		if slices1[i] != slices2[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // スライスの先頭がスライスと一致していたら true を返す。
 func StartWith[T comparable](slice1 []T, slice2 []T) bool {
 	if len(slice1) < len(slice2) {
@@ -567,6 +647,9 @@ func FilterInPlace[T comparable](slice []T, v T) []T {
 			c++
 		}
 	}
+	for i := c; i < len(slice); i++ {
+		slice[i] = *new(T)
+	}
 	return slice[:c]
 }
 
@@ -578,6 +661,9 @@ func FilterInPlaceFunc[T any](slice []T, f func(T) bool) []T {
 			slice[c], slice[i] = slice[i], slice[c]
 			c++
 		}
+	}
+	for i := c; i < len(slice); i++ {
+		slice[i] = *new(T)
 	}
 	return slice[:c]
 }
@@ -613,6 +699,9 @@ func FilterNotInPlace[T comparable](slice []T, v T) []T {
 			c++
 		}
 	}
+	for i := c; i < len(slice); i++ {
+		slice[i] = *new(T)
+	}
 	return slice[:c]
 }
 
@@ -624,6 +713,9 @@ func FilterNotInPlaceFunc[T any](slice []T, f func(T) bool) []T {
 			slice[c], slice[i] = slice[i], slice[c]
 			c++
 		}
+	}
+	for i := c; i < len(slice); i++ {
+		slice[i] = *new(T)
 	}
 	return slice[:c]
 }
@@ -794,11 +886,37 @@ func MinBy[T1 any, T2 ordered](slice []T1, f func(T1) T2) T2 {
 	return min
 }
 
-// すべての要素に値を代入する
+// すべての要素に値を代入する。
 func Fill[T any](slice []T, v T) {
 	for i := range slice {
 		slice[i] = v
 	}
+}
+
+// 要素がn個になるまで先頭にvを挿入する。
+func PadLeft[T any](slice []T, n int, v T) []T {
+	if len(slice) >= n {
+		return slice
+	}
+	c := n - len(slice)
+	t := make([]T, c)
+	for i := 0; i < len(t); i++ {
+		t[i] = v
+	}
+	return append(t, slice...)
+}
+
+// 要素がn個になるまで末尾にvを挿入する。
+func PadRight[T any](slice []T, n int, v T) []T {
+	if len(slice) >= n {
+		return slice
+	}
+	c := n - len(slice)
+	t := make([]T, c)
+	for i := 0; i < len(t); i++ {
+		t[i] = v
+	}
+	return append(slice, t...)
 }
 
 // ふたつのスライスの同じ位置の要素をペアにしたスライスを返す。
