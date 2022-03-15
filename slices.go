@@ -209,6 +209,16 @@ func ContainsAny[T comparable](slice []T, subset []T) bool {
 	return false
 }
 
+// 他のスライスの要素をひとつでも内包していたらtrue。
+func ContainsAnyFunc[T any](slice []T, subset []T, f func(T, T) bool) bool {
+	for i := range subset {
+		if ContainsFunc(slice, func(v T) bool { return f(v, subset[i]) }) {
+			return true
+		}
+	}
+	return false
+}
+
 // 値と一致する要素の数を返す。
 func Count[T comparable](slice []T, v T) int {
 	c := 0
@@ -281,7 +291,7 @@ func Reverse[T any](slice []T) []T {
 }
 
 // 逆順にしたスライスを返す。
-func ReverseInPlace[T any](slice []T) []T {
+func ReverseInplace[T any](slice []T) []T {
 	for i := 0; i < len(slice)/2; i++ {
 		j := len(slice) - i - 1
 		slice[i], slice[j] = slice[j], slice[i]
@@ -543,6 +553,19 @@ func Equal[T comparable](slices1 []T, slices2 []T) bool {
 	return true
 }
 
+// スライスが一致していたらtrue。
+func EqualFunc[T any](slices1 []T, slices2 []T, f func(T, T) bool) bool {
+	if len(slices1) != len(slices2) {
+		return false
+	}
+	for i := 0; i < len(slices1); i++ {
+		if !f(slices1[i], slices2[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // スライスの先頭がスライスと一致していたら true を返す。
 func StartWith[T comparable](slice1 []T, slice2 []T) bool {
 	if len(slice1) < len(slice2) {
@@ -555,6 +578,24 @@ func StartWith[T comparable](slice1 []T, slice2 []T) bool {
 		}
 
 		if slice1[i] != slice2[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// スライスの先頭がスライスと一致していたら true を返す。
+func StartWithFunc[T any](slice1 []T, slice2 []T, f func(T, T) bool) bool {
+	if len(slice1) < len(slice2) {
+		return false
+	}
+
+	for i := range slice2 {
+		if i >= len(slice1) {
+			return false
+		}
+
+		if !f(slice1[i], slice2[i]) {
 			return false
 		}
 	}
@@ -581,6 +622,26 @@ func EndWith[T comparable](slice1 []T, slice2 []T) bool {
 	return true
 }
 
+// スライスの終端がスライスと一致していたら true を返す。
+func EndWithFunc[T any](slice1 []T, slice2 []T, f func(T, T) bool) bool {
+	if len(slice1) < len(slice2) {
+		return false
+	}
+
+	n := len(slice1) - len(slice2)
+
+	for i := len(slice2) - 1; i >= 0; i-- {
+		if i+n >= len(slice1) {
+			return false
+		}
+		if !f(slice1[i+n], slice2[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // 重複を排除したスライスを返す。
 // 入力スライスはソートされている必要がある。
 func Unique[T comparable](slice []T) []T {
@@ -600,12 +661,47 @@ func Unique[T comparable](slice []T) []T {
 }
 
 // 重複を排除したスライスを返す。
-func UniqueInPlace[T comparable](slice []T) []T {
+// 入力スライスはソートされている必要がある。
+func UniqueFunc[T any](slice []T, f func(T, T) bool) []T {
+	dst := make([]T, 0, len(slice))
+
+	if len(slice) > 0 {
+		dst = append(dst, slice[0])
+	}
+
+	for i := 1; i < len(slice); i++ {
+		if !f(slice[i], slice[i-1]) {
+			dst = append(dst, slice[i])
+		}
+	}
+
+	return dst
+}
+
+// 重複を排除したスライスを返す。
+func UniqueInplace[T comparable](slice []T) []T {
 	size := len(slice)
 	var j int
 	for i := 0; i < size; i++ {
 		for j = i + 1; j < size; {
 			if slice[i] == slice[j] {
+				size--
+				slice[j], slice[size] = slice[size], slice[j]
+			} else {
+				j++
+			}
+		}
+	}
+	return slice[:size]
+}
+
+// 重複を排除したスライスを返す。
+func UniqueInplaceFunc[T any](slice []T, f func(T, T) bool) []T {
+	size := len(slice)
+	var j int
+	for i := 0; i < size; i++ {
+		for j = i + 1; j < size; {
+			if f(slice[i], slice[j]) {
 				size--
 				slice[j], slice[size] = slice[size], slice[j]
 			} else {
@@ -639,7 +735,7 @@ func FilterFunc[T any](slice []T, f func(T) bool) []T {
 }
 
 // 値の一致する要素だけのスライスを返す。
-func FilterInPlace[T comparable](slice []T, v T) []T {
+func FilterInplace[T comparable](slice []T, v T) []T {
 	c := 0
 	for i := range slice {
 		if slice[i] == v {
@@ -654,7 +750,7 @@ func FilterInPlace[T comparable](slice []T, v T) []T {
 }
 
 // 条件を満たす要素だけのスライスを返す。
-func FilterInPlaceFunc[T any](slice []T, f func(T) bool) []T {
+func FilterInplaceFunc[T any](slice []T, f func(T) bool) []T {
 	c := 0
 	for i := range slice {
 		if f(slice[i]) {
@@ -691,7 +787,7 @@ func FilterNotFunc[T any](slice []T, f func(T) bool) []T {
 }
 
 // 値の一致しない要素だけのスライスを返す。
-func FilterNotInPlace[T comparable](slice []T, v T) []T {
+func FilterNotInplace[T comparable](slice []T, v T) []T {
 	c := 0
 	for i := range slice {
 		if slice[i] != v {
@@ -706,7 +802,7 @@ func FilterNotInPlace[T comparable](slice []T, v T) []T {
 }
 
 // 条件を満たさない要素だけのスライスを返す。
-func FilterNotInPlaceFunc[T any](slice []T, f func(T) bool) []T {
+func FilterNotInplaceFunc[T any](slice []T, f func(T) bool) []T {
 	c := 0
 	for i := range slice {
 		if !f(slice[i]) {
@@ -760,18 +856,6 @@ func Partition[T comparable](slice []T, v T) ([]T, []T) {
 	return dst1, dst2
 }
 
-// 値の一致するスライスと一致しないスライスを返す。
-func PartitionInPlace[T comparable](slice []T, v T) ([]T, []T) {
-	c := 0
-	for i := range slice {
-		if slice[i] == v {
-			slice[c], slice[i] = slice[i], slice[c]
-			c++
-		}
-	}
-	return slice[:c], slice[c:]
-}
-
 // 条件を満たすスライスと満たさないスライスを返す。
 func PartitionFunc[T any](slice []T, f func(T) bool) ([]T, []T) {
 	dst1 := make([]T, 0, len(slice)/2)
@@ -786,8 +870,20 @@ func PartitionFunc[T any](slice []T, f func(T) bool) ([]T, []T) {
 	return dst1, dst2
 }
 
+// 値の一致するスライスと一致しないスライスを返す。
+func PartitionInplace[T comparable](slice []T, v T) ([]T, []T) {
+	c := 0
+	for i := range slice {
+		if slice[i] == v {
+			slice[c], slice[i] = slice[i], slice[c]
+			c++
+		}
+	}
+	return slice[:c], slice[c:]
+}
+
 // 条件を満たすスライスと満たさないスライスを返す。
-func PartitionInPlaceFunc[T any](slice []T, f func(T) bool) ([]T, []T) {
+func PartitionInplaceFunc[T any](slice []T, f func(T) bool) ([]T, []T) {
 	c := 0
 	for i := range slice {
 		if f(slice[i]) {
