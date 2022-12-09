@@ -6,6 +6,24 @@ import (
 	"github.com/thamaji/slices/tuple"
 )
 
+// 指定した値をn個複製したスライスを返す。
+func Repeat[T any](n int, v T) []T {
+	slice := make([]T, n)
+	for i := 0; i < n; i++ {
+		slice[i] = v
+	}
+	return slice
+}
+
+// 指定した値をn個複製したスライスを返す。
+func RepeatBy[T any](n int, f func() T) []T {
+	slice := make([]T, n)
+	for i := 0; i < n; i++ {
+		slice[i] = f()
+	}
+	return slice
+}
+
 // 指定した位置の要素を返す。
 func Get[T any](slice []T, index int) (T, bool) {
 	if index < len(slice) {
@@ -367,6 +385,46 @@ func Indices[T any](slice []T) []int {
 		indices = append(indices, i)
 	}
 	return indices
+}
+
+// 先頭からひとつ目のoldをnewで置き換えたスライスを返す。
+func Replace[T comparable](slice []T, old T, new T) []T {
+	flag := true
+	dst := make([]T, len(slice))
+	for i := range slice {
+		if flag && slice[i] == old {
+			dst[i] = new
+			flag = false
+		} else {
+			dst[i] = slice[i]
+		}
+	}
+	return dst
+}
+
+// すべてのoldをnewで置き換えたスライスを返す。
+func ReplaceAll[T comparable](slice []T, old T, new T) []T {
+	dst := make([]T, len(slice))
+	for i := range slice {
+		if slice[i] == old {
+			dst[i] = new
+		} else {
+			dst[i] = slice[i]
+		}
+	}
+	return dst
+}
+
+// ゼロ値の要素を除いたスライスを返す。
+func Clean[T comparable](slice []T) []T {
+	zero := *new(T)
+	dst := make([]T, 0, len(slice))
+	for i := range slice {
+		if slice[i] != zero {
+			dst = append(dst, slice[i])
+		}
+	}
+	return dst
 }
 
 // 値を変換したスライスを返す。
