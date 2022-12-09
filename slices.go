@@ -2,23 +2,9 @@ package slices
 
 import (
 	"math/rand"
+
+	"github.com/thamaji/slices/tuple"
 )
-
-type integer interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
-}
-
-type float interface {
-	~float32 | ~float64
-}
-
-type complex interface {
-	~complex64 | ~complex128
-}
-
-type ordered interface {
-	integer | float | string
-}
 
 // 指定した位置の要素を返す。
 func Get[T any](slice []T, index int) (T, bool) {
@@ -32,6 +18,38 @@ func Get[T any](slice []T, index int) (T, bool) {
 func GetOrElse[T any](slice []T, index int, v T) T {
 	if index < len(slice) {
 		return slice[index]
+	}
+	return v
+}
+
+// 先頭の要素を返す。
+func GetFirst[T any](slice []T) (T, bool) {
+	if len(slice) > 0 {
+		return slice[0], true
+	}
+	return *new(T), false
+}
+
+// 先頭の要素を返す。無い場合はvを返す。
+func GetFirstOrElse[T any](slice []T, v T) T {
+	if len(slice) > 0 {
+		return slice[0]
+	}
+	return v
+}
+
+// 終端の要素を返す。
+func GetLast[T any](slice []T) (T, bool) {
+	if len(slice) > 0 {
+		return slice[len(slice)-1], true
+	}
+	return *new(T), false
+}
+
+// 終端の要素を返す。無い場合はvを返す。
+func GetLastOrElse[T any](slice []T, v T) T {
+	if len(slice) > 0 {
+		return slice[len(slice)-1]
 	}
 	return v
 }
@@ -115,6 +133,21 @@ func RemoveN[T any](slice []T, index int, n int) []T {
 	return slice[:len(slice)-n]
 }
 
+// 要素をすべて削除する。
+func Clear[T any](slice []T) []T {
+	for i := range slice {
+		slice[i] = *new(T)
+	}
+	return slice[:0]
+}
+
+// 要素をすべてコピーしたスライスを返す。
+func Clone[T any](slice []T) []T {
+	clone := make([]T, len(slice))
+	copy(clone, slice)
+	return clone
+}
+
 // 要素をランダムに入れ替える。
 func Shuffle[T any](slice []T, r *rand.Rand) {
 	var n int
@@ -159,6 +192,18 @@ func combine[T any](dst [][]T, slice []T) [][]T {
 	return dst[size:]
 }
 
+// スライスをn個ずつ分割したスライスを返す。
+func Grouped[T any](slice []T, n int) [][]T {
+	if len(slice) == 0 {
+		return [][]T{}
+	}
+	grouped := make([][]T, len(slice)/n)
+	for i := range slice {
+		grouped[i/n] = append(grouped[i/n], slice[i])
+	}
+	return grouped
+}
+
 // １つでも値と一致する要素が存在したらtrue。
 func Contains[T comparable](slice []T, v T) bool {
 	for i := range slice {
@@ -170,7 +215,7 @@ func Contains[T comparable](slice []T, v T) bool {
 }
 
 // １つでも条件を満たす要素が存在したらtrue。
-func ContainsFunc[T any](slice []T, f func(T) bool) bool {
+func ContainsBy[T any](slice []T, f func(T) bool) bool {
 	for i := range slice {
 		if f(slice[i]) {
 			return true
@@ -190,7 +235,7 @@ func ContainsAll[T comparable](slice []T, subset []T) bool {
 }
 
 // すべての要素が条件を満たしたらtrue。
-func ContainsAllFunc[T any](slice []T, f func(T) bool) bool {
+func ContainsAllBy[T any](slice []T, f func(T) bool) bool {
 	for i := range slice {
 		if !f(slice[i]) {
 			return false
@@ -209,12 +254,19 @@ func ContainsAny[T comparable](slice []T, subset []T) bool {
 	return false
 }
 
-// 他のスライスの要素をひとつでも内包していたらtrue。
-func ContainsAnyFunc[T any](slice []T, subset []T, f func(T, T) bool) bool {
-	for i := range subset {
-		if ContainsFunc(slice, func(v T) bool { return f(v, subset[i]) }) {
-			return true
+// 他のスライスを内包していたらtrue。
+func ContainsSlice[T comparable](slice []T, subset []T) bool {
+OUTER:
+	for i := range slice {
+		if len(slice)-i > len(subset) {
+			break
 		}
+		for j := range subset {
+			if slice[i] != subset[j] {
+				continue OUTER
+			}
+		}
+		return true
 	}
 	return false
 }
@@ -231,7 +283,7 @@ func Count[T comparable](slice []T, v T) int {
 }
 
 // 条件を満たす要素の数を返す。
-func CountFunc[T any](slice []T, f func(T) bool) int {
+func CountBy[T any](slice []T, f func(T) bool) int {
 	c := 0
 	for i := range slice {
 		if f(slice[i]) {
@@ -252,7 +304,7 @@ func Index[T comparable](slice []T, v T) int {
 }
 
 // 条件を満たす最初の要素の位置を返す。
-func IndexFunc[T any](slice []T, f func(T) bool) int {
+func IndexBy[T any](slice []T, f func(T) bool) int {
 	for i := range slice {
 		if f(slice[i]) {
 			return i
@@ -272,7 +324,7 @@ func LastIndex[T comparable](slice []T, v T) int {
 }
 
 // 条件を満たす最後の要素の位置を返す。
-func LastIndexFunc[T any](slice []T, f func(T) bool) int {
+func LastIndexBy[T any](slice []T, f func(T) bool) int {
 	for i := len(slice) - 1; i >= 0; i-- {
 		if f(slice[i]) {
 			return i
@@ -299,8 +351,26 @@ func ReverseInplace[T any](slice []T) []T {
 	return slice
 }
 
+// 連番のスライスを返す。
+func Range[T ordered](start T, stop T, step T) []T {
+	slice := []T{}
+	for i := start; i < stop; i += step {
+		slice = append(slice, i)
+	}
+	return slice
+}
+
+// スライスのインデックスのスライスを返す。
+func Indices[T any](slice []T) []int {
+	indices := make([]int, len(slice))
+	for i := range indices {
+		indices = append(indices, i)
+	}
+	return indices
+}
+
 // 値を変換したスライスを返す。
-func MapFunc[T1, T2 any](slice []T1, f func(T1) T2) []T2 {
+func Map[T1, T2 any](slice []T1, f func(T1) T2) []T2 {
 	dst := make([]T2, len(slice))
 	for i := range slice {
 		dst[i] = f(slice[i])
@@ -309,7 +379,7 @@ func MapFunc[T1, T2 any](slice []T1, f func(T1) T2) []T2 {
 }
 
 // 要素を先頭から順に演算する。
-func ReduceFunc[T any](slice []T, f func(T, T) T) T {
+func Reduce[T any](slice []T, f func(T, T) T) T {
 	if len(slice) == 0 {
 		return *new(T)
 	}
@@ -322,7 +392,7 @@ func ReduceFunc[T any](slice []T, f func(T, T) T) T {
 }
 
 // 要素を終端から順に演算する。
-func ReduceRightFunc[T any](slice []T, f func(T, T) T) T {
+func ReduceRight[T any](slice []T, f func(T, T) T) T {
 	if len(slice) == 0 {
 		return *new(T)
 	}
@@ -335,7 +405,7 @@ func ReduceRightFunc[T any](slice []T, f func(T, T) T) T {
 }
 
 // 初期値と要素を先頭から順に演算する。
-func FoldFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) T2 {
+func Fold[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) T2 {
 	for i := range slice {
 		v = f(v, slice[i])
 	}
@@ -343,7 +413,7 @@ func FoldFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) T2 {
 }
 
 // 初期値と要素を終端から順に演算する。
-func FoldRightFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) T2 {
+func FoldRight[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) T2 {
 	for i := len(slice) - 1; i >= 0; i-- {
 		v = f(v, slice[i])
 	}
@@ -351,7 +421,7 @@ func FoldRightFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) T2 {
 }
 
 // 初期値と要素を先頭から順に演算して途中経過のスライスを返す。
-func ScanFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) []T2 {
+func Scan[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) []T2 {
 	dst := make([]T2, 0, len(slice)+1)
 	dst = append(dst, v)
 	for i := range slice {
@@ -362,7 +432,7 @@ func ScanFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) []T2 {
 }
 
 // 初期値と要素を終端から順に演算して途中経過のスライスを返す。
-func ScanRightFunc[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) []T2 {
+func ScanRight[T1, T2 any](slice []T1, v T2, f func(T2, T1) T2) []T2 {
 	dst := make([]T2, 0, len(slice)+1)
 	dst = append(dst, v)
 	for i := len(slice) - 1; i >= 0; i-- {
@@ -382,7 +452,7 @@ func Flatten[T any](slice [][]T) []T {
 }
 
 // 値をスライスに変換し、それらを結合したスライスを返す。
-func FlatMapFunc[T1, T2 any](slice []T1, f func(T1) []T2) []T2 {
+func FlatMap[T1, T2 any](slice []T1, f func(T1) []T2) []T2 {
 	dst := make([]T2, 0, len(slice))
 	for i := range slice {
 		dst = append(dst, f(slice[i])...)
@@ -404,7 +474,7 @@ func Split[T comparable](slice []T, v T) [][]T {
 }
 
 // 条件を満たす要素で分割したスライスを返す。
-func SplitFunc[T any](slice []T, f func(T) bool) [][]T {
+func SplitBy[T any](slice []T, f func(T) bool) [][]T {
 	dst := [][]T{{}}
 	for i := range slice {
 		if f(slice[i]) {
@@ -429,7 +499,7 @@ func SplitAfter[T comparable](slice []T, v T) [][]T {
 }
 
 // 条件を満たす要素の直後で分割したスライスを返す。
-func SplitAfterFunc[T any](slice []T, f func(T) bool) [][]T {
+func SplitAfterBy[T any](slice []T, f func(T) bool) [][]T {
 	dst := [][]T{{}}
 	for i := range slice {
 		dst[len(dst)-1] = append(dst[len(dst)-1], slice[i])
@@ -451,7 +521,7 @@ func Find[T comparable](slice []T, v T) (ret T, ok bool) {
 }
 
 // 条件を満たす最初の要素を返す。
-func FindFunc[T any](slice []T, f func(T) bool) (ret T, ok bool) {
+func FindBy[T any](slice []T, f func(T) bool) (ret T, ok bool) {
 	for _, t := range slice {
 		if f(t) {
 			return t, true
@@ -471,7 +541,7 @@ func Span[T comparable](slice []T, v T) ([]T, []T) {
 }
 
 // 条件を満たす先頭部分と満たさない残りの部分を返す。
-func SpanFunc[T any](slice []T, f func(T) bool) ([]T, []T) {
+func SpanBy[T any](slice []T, f func(T) bool) ([]T, []T) {
 	for i := range slice {
 		if !f(slice[i]) {
 			return slice[0:i], slice[i:]
@@ -501,7 +571,7 @@ func TakeWhile[T comparable](slice []T, v T) []T {
 
 // 条件を満たす先頭のスライスを返す。
 // 条件を満たさなかった時点で終了する。
-func TakeWhileFunc[T any](slice []T, f func(T) bool) []T {
+func TakeWhileBy[T any](slice []T, f func(T) bool) []T {
 	for i := range slice {
 		if !f(slice[i]) {
 			return slice[0:i]
@@ -531,7 +601,7 @@ func DropWhile[T comparable](slice []T, v T) []T {
 
 // 条件を満たす先頭の要素を除いていったスライスを返す。
 // 条件を満たさなかった時点で終了する。
-func DropWhileFunc[T any](slice []T, f func(T) bool) []T {
+func DropWhileBy[T any](slice []T, f func(T) bool) []T {
 	for i := range slice {
 		if !f(slice[i]) {
 			return slice[i:]
@@ -554,7 +624,7 @@ func Equal[T comparable](slices1 []T, slices2 []T) bool {
 }
 
 // スライスが一致していたらtrue。
-func EqualFunc[T any](slices1 []T, slices2 []T, f func(T, T) bool) bool {
+func EqualBy[T any](slices1 []T, slices2 []T, f func(T, T) bool) bool {
 	if len(slices1) != len(slices2) {
 		return false
 	}
@@ -585,7 +655,7 @@ func StartWith[T comparable](slice1 []T, slice2 []T) bool {
 }
 
 // スライスの先頭がスライスと一致していたら true を返す。
-func StartWithFunc[T any](slice1 []T, slice2 []T, f func(T, T) bool) bool {
+func StartWithBy[T any](slice1 []T, slice2 []T, f func(T, T) bool) bool {
 	if len(slice1) < len(slice2) {
 		return false
 	}
@@ -623,7 +693,7 @@ func EndWith[T comparable](slice1 []T, slice2 []T) bool {
 }
 
 // スライスの終端がスライスと一致していたら true を返す。
-func EndWithFunc[T any](slice1 []T, slice2 []T, f func(T, T) bool) bool {
+func EndWithBy[T any](slice1 []T, slice2 []T, f func(T, T) bool) bool {
 	if len(slice1) < len(slice2) {
 		return false
 	}
@@ -662,7 +732,7 @@ func Unique[T comparable](slice []T) []T {
 
 // 重複を排除したスライスを返す。
 // 入力スライスはソートされている必要がある。
-func UniqueFunc[T any](slice []T, f func(T, T) bool) []T {
+func UniqueBy[T any](slice []T, f func(T, T) bool) []T {
 	dst := make([]T, 0, len(slice))
 
 	if len(slice) > 0 {
@@ -696,7 +766,7 @@ func UniqueInplace[T comparable](slice []T) []T {
 }
 
 // 重複を排除したスライスを返す。
-func UniqueInplaceFunc[T any](slice []T, f func(T, T) bool) []T {
+func UniqueByInplace[T any](slice []T, f func(T, T) bool) []T {
 	size := len(slice)
 	var j int
 	for i := 0; i < size; i++ {
@@ -724,7 +794,7 @@ func Filter[T comparable](slice []T, v T) []T {
 }
 
 // 条件を満たす要素だけのスライスを返す。
-func FilterFunc[T any](slice []T, f func(T) bool) []T {
+func FilterBy[T any](slice []T, f func(T) bool) []T {
 	dst := make([]T, 0, len(slice))
 	for i := range slice {
 		if f(slice[i]) {
@@ -750,7 +820,7 @@ func FilterInplace[T comparable](slice []T, v T) []T {
 }
 
 // 条件を満たす要素だけのスライスを返す。
-func FilterInplaceFunc[T any](slice []T, f func(T) bool) []T {
+func FilterByInplace[T any](slice []T, f func(T) bool) []T {
 	c := 0
 	for i := range slice {
 		if f(slice[i]) {
@@ -776,7 +846,7 @@ func FilterNot[T comparable](slice []T, v T) []T {
 }
 
 // 条件を満たさない要素だけのスライスを返す。
-func FilterNotFunc[T any](slice []T, f func(T) bool) []T {
+func FilterNotBy[T any](slice []T, f func(T) bool) []T {
 	dst := make([]T, 0, len(slice))
 	for i := range slice {
 		if !f(slice[i]) {
@@ -802,7 +872,7 @@ func FilterNotInplace[T comparable](slice []T, v T) []T {
 }
 
 // 条件を満たさない要素だけのスライスを返す。
-func FilterNotInplaceFunc[T any](slice []T, f func(T) bool) []T {
+func FilterNotByInplace[T any](slice []T, f func(T) bool) []T {
 	c := 0
 	for i := range slice {
 		if !f(slice[i]) {
@@ -817,7 +887,7 @@ func FilterNotInplaceFunc[T any](slice []T, f func(T) bool) []T {
 }
 
 // 条件を満たす要素を変換したスライスを返す。
-func CollectFunc[T1, T2 any](slice []T1, f func(T1) (T2, bool)) []T2 {
+func Collect[T1, T2 any](slice []T1, f func(T1) (T2, bool)) []T2 {
 	dst := make([]T2, 0, len(slice))
 	for i := range slice {
 		if v, ok := f(slice[i]); ok {
@@ -857,7 +927,7 @@ func Partition[T comparable](slice []T, v T) ([]T, []T) {
 }
 
 // 条件を満たすスライスと満たさないスライスを返す。
-func PartitionFunc[T any](slice []T, f func(T) bool) ([]T, []T) {
+func PartitionBy[T any](slice []T, f func(T) bool) ([]T, []T) {
 	dst1 := make([]T, 0, len(slice)/2)
 	dst2 := make([]T, 0, len(slice)/2)
 	for i := range slice {
@@ -883,7 +953,7 @@ func PartitionInplace[T comparable](slice []T, v T) ([]T, []T) {
 }
 
 // 条件を満たすスライスと満たさないスライスを返す。
-func PartitionInplaceFunc[T any](slice []T, f func(T) bool) ([]T, []T) {
+func PartitionByInplace[T any](slice []T, f func(T) bool) ([]T, []T) {
 	c := 0
 	for i := range slice {
 		if f(slice[i]) {
@@ -907,6 +977,19 @@ func Sum[T ordered | complex](slice []T) T {
 	return v
 }
 
+// 要素を変換して合計を返す。
+func SumBy[T1 any, T2 ordered](slice []T1, f func(T1) T2) T2 {
+	if len(slice) == 0 {
+		return *new(T2)
+	}
+
+	v := *new(T2)
+	for i := 0; i < len(slice); i++ {
+		v += f(slice[i])
+	}
+	return v
+}
+
 // 要素をすべて掛ける。
 func Product[T integer | float | complex](slice []T) T {
 	if len(slice) == 0 {
@@ -916,6 +999,19 @@ func Product[T integer | float | complex](slice []T) T {
 	v := slice[0]
 	for i := 1; i < len(slice); i++ {
 		v *= slice[i]
+	}
+	return v
+}
+
+// 要素を変換してすべて掛ける。
+func ProductBy[T1 any, T2 integer | float](slice []T1, f func(T1) T2) T2 {
+	if len(slice) == 0 {
+		return *new(T2)
+	}
+
+	v := *new(T2)
+	for i := 0; i < len(slice); i++ {
+		v *= f(slice[i])
 	}
 	return v
 }
@@ -989,8 +1085,22 @@ func Fill[T any](slice []T, v T) {
 	}
 }
 
+// すべての要素にゼロ値を代入する。
+func FillZero[T any](slice []T) {
+	for i := range slice {
+		slice[i] = *new(T)
+	}
+}
+
+// すべての要素に関数の実行結果を代入する。
+func FillBy[T any](slice []T, f func(int) T) {
+	for i := range slice {
+		slice[i] = f(i)
+	}
+}
+
 // 要素がn個になるまで先頭にvを挿入する。
-func PadLeft[T any](slice []T, n int, v T) []T {
+func Pad[T any](slice []T, n int, v T) []T {
 	if len(slice) >= n {
 		return slice
 	}
@@ -998,6 +1108,32 @@ func PadLeft[T any](slice []T, n int, v T) []T {
 	t := make([]T, c)
 	for i := 0; i < len(t); i++ {
 		t[i] = v
+	}
+	return append(t, slice...)
+}
+
+// 要素がn個になるまで先頭にゼロ値を挿入する。
+func PadZero[T any](slice []T, n int) []T {
+	if len(slice) >= n {
+		return slice
+	}
+	c := n - len(slice)
+	t := make([]T, c)
+	for i := 0; i < len(t); i++ {
+		t[i] = *new(T)
+	}
+	return append(t, slice...)
+}
+
+// 要素がn個になるまで先頭に関数の実行結果を挿入する。
+func PadBy[T any](slice []T, n int, f func(int) T) []T {
+	if len(slice) >= n {
+		return slice
+	}
+	c := n - len(slice)
+	t := make([]T, c)
+	for i := 0; i < len(t); i++ {
+		t[i] = f(i)
 	}
 	return append(t, slice...)
 }
@@ -1015,30 +1151,57 @@ func PadRight[T any](slice []T, n int, v T) []T {
 	return append(slice, t...)
 }
 
+// 要素がn個になるまで末尾にゼロ値を挿入する。
+func PadZeroRight[T any](slice []T, n int) []T {
+	if len(slice) >= n {
+		return slice
+	}
+	c := n - len(slice)
+	t := make([]T, c)
+	for i := 0; i < len(t); i++ {
+		t[i] = *new(T)
+	}
+	return append(slice, t...)
+}
+
+// 要素がn個になるまで末尾に関数の実行結果を挿入する。
+func PadRightBy[T any](slice []T, n int, f func(int) T) []T {
+	if len(slice) >= n {
+		return slice
+	}
+	c := n - len(slice)
+	t := make([]T, c)
+	for i := 0; i < len(t); i++ {
+		t[i] = f(len(slice) + i)
+	}
+	return append(slice, t...)
+}
+
 // ふたつのスライスの同じ位置の要素をペアにしたスライスを返す。
-func Zip[T1, T2 any](slice1 []T1, slice2 []T2) []Tuple2[T1, T2] {
+// ふたつのスライスの要素数が異なる場合、小さいほうに合わせる。
+func Zip[T1, T2 any](slice1 []T1, slice2 []T2) []tuple.T2[T1, T2] {
 	size := len(slice1)
 	if size > len(slice2) {
 		size = len(slice2)
 	}
-	dst := make([]Tuple2[T1, T2], 0, size)
+	dst := make([]tuple.T2[T1, T2], 0, size)
 	for i := 0; i < size; i++ {
-		dst = append(dst, NewTuple2(slice1[i], slice2[i]))
+		dst = append(dst, tuple.NewT2(slice1[i], slice2[i]))
 	}
 	return dst
 }
 
 // スライスの要素と位置をペアにしたスライスを返す。
-func ZipWithIndex[T any](slice []T) []Tuple2[T, int] {
-	dst := make([]Tuple2[T, int], 0, len(slice))
+func ZipWithIndex[T any](slice []T) []tuple.T2[T, int] {
+	dst := make([]tuple.T2[T, int], 0, len(slice))
 	for i := range slice {
-		dst = append(dst, NewTuple2(slice[i], i))
+		dst = append(dst, tuple.NewT2(slice[i], i))
 	}
 	return dst
 }
 
 // 要素を分離してふたつのスライスを返す。
-func Unzip[T1, T2 any](slice []Tuple2[T1, T2]) ([]T1, []T2) {
+func Unzip[T1, T2 any](slice []tuple.T2[T1, T2]) ([]T1, []T2) {
 	dst1 := make([]T1, 0, len(slice))
 	dst2 := make([]T2, 0, len(slice))
 	for i := range slice {
@@ -1046,4 +1209,18 @@ func Unzip[T1, T2 any](slice []Tuple2[T1, T2]) ([]T1, []T2) {
 		dst2 = append(dst2, slice[i].V2)
 	}
 	return dst1, dst2
+}
+
+// 値に区切り要素を挟んでスライスにする。
+func Join[T any](separator T, values ...T) []T {
+	if len(values) == 0 {
+		return []T{}
+	}
+	slice := make([]T, 0, len(values)*2-1)
+	n := len(values) - 1
+	for i := 0; i < n; i++ {
+		slice = append(slice, values[i], separator)
+	}
+	slice = append(slice, values[n])
+	return slice
 }
