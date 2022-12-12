@@ -25,7 +25,7 @@ func FromMap[K ordered, V any](m map[K]V) []tuple.T2[K, V] {
 }
 
 // マップのキーをスライスに変換する。
-func FromMapKeys[K ordered, V any](m map[K]V) []K {
+func FromMapKeys[K comparable, V any](m map[K]V) []K {
 	keys := make([]K, 0, len(m))
 	for key := range m {
 		keys = append(keys, key)
@@ -34,7 +34,7 @@ func FromMapKeys[K ordered, V any](m map[K]V) []K {
 }
 
 // マップの値をスライスに変換する。
-func FromMapValues[K ordered, V any](m map[K]V) []V {
+func FromMapValues[K comparable, V any](m map[K]V) []V {
 	values := make([]V, 0, len(m))
 	for _, value := range m {
 		values = append(values, value)
@@ -59,4 +59,12 @@ func FromFunc[T any](n int, f func(int) T) []T {
 		slice = append(slice, f(i))
 	}
 	return slice
+}
+
+// 値と値の有無を受け取ってスライスにする。
+func Option[T any](v T, ok bool) []T {
+	if ok {
+		return []T{v}
+	}
+	return []T{}
 }
